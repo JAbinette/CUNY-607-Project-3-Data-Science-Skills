@@ -55,7 +55,7 @@ names(pop_raw) <- c("CITY","STATE","POPULATION2021")
 
 # Add Location ID field
 pop_raw$LOCATIONID <- seq(1, nrow(pop_raw))
-
+pop_raw <- as.data.frame(pop_raw)
 head(pop_raw)
 ```
 
@@ -174,5 +174,85 @@ job_skills_raw$WebScraping <- str_detect(job_skills_raw$Description, 'WEB SCRAPI
 job_skills_raw$Wrangling <- str_detect(job_skills_raw$Description, 'WRANGLING', negate = FALSE)
 
 head(job_skills_raw)
+
 ```
 
+## Establish database connection
+Must have RMySQL package installed
+```{r}
+#Prompt for username and password for security 
+user_name <- .rs.askForPassword("Enter the Database user name")
+password <- .rs.askForPassword("Enter the Database password")
+#Establish connection to DB
+con <- dbConnect(RMySQL::MySQL(), 
+                 dbname = "ds_jobs", 
+                 host = "35.199.43.105", 
+                 port = 3306,
+                 user = user_name,
+                 password = password)
+```
+
+## Load location table data into DB
+```{r}
+col_order <- c("LOCATIONID", "CITY", "STATE",
+               "POPULATION2021")
+location_insert <- pop_raw[, col_order] #reorder columns to match db
+location_insert <- location_insert |> #rename columns to match db
+                    dplyr::rename("location_id" = "LOCATIONID",
+                                  "city" = "CITY",
+                                  "state" = "STATE",
+                                  "population" = "POPULATION2021")
+dbWriteTable(con, "location", location_insert, overwrite = FALSE, append = TRUE, row.names = FALSE) #load into DB
+test_location <- odbc::dbGetQuery(con, "SELECT * FROM ds_jobs.location LIMIT 6;") #test insert
+print(test_location)
+```
+## Load skills table data into DB
+```{r}
+skill_insert <- skills_load |> dplyr::select(SkillsID, Data.Science.Skills) #subset skills
+skill_insert <- skill_insert |>                                             #rename columns to match db
+                    dplyr::rename("skill_id" = "SkillsID",
+                                  "skill" = "Data.Science.Skills")
+dbWriteTable(con, "skill", skill_insert, overwrite = FALSE, append = TRUE, row.names = FALSE) #load into DB
+test_skill <- odbc::dbGetQuery(con, "SELECT * FROM ds_jobs.skill LIMIT 6;") #test insert
+print(test_skill)
+```
+
+## Load job table data into DB
+```{r}
+job_insert <- job_list |>
+                    dplyr::rename("job_id" = "JobID",          #rename columns to match db
+                                  "title" = "Position",
+                                  "location_id" = "LOCATIONID",
+                                  "company" = "Company",
+                                  "description" = "Description")
+dbWriteTable(con, "job", job_insert, overwrite = FALSE, append = TRUE, row.names = FALSE) #load into DB
+test_job <- odbc::dbGetQuery(con, "SELECT * FROM ds_jobs.job LIMIT 6;") #test insert
+print(test_job)
+```
+
+## Load job skills data into DB
+```{r}
+job_skill_long <- job_skills_raw |> dplyr::select(!Description) |>    
+                  tidyr::pivot_longer(!JobID, names_to = "skill", values_to = "t_f") #pivot to long data frame format
+job_skill_long <- job_skill_long |> left_join(skills_load, by = c("skill"="Variable.Name")) |>
+job_skill_insert <- job_skill_long |> dplyr::filter(t_f == "TRUE") |> #subset for only true skill matches
+                    dplyr::select(JobID, SkillsID) |>
+                    dplyr::rename("job_id" = "JobID", "skill_id" = "SkillsID")
+
+dbWriteTable(con, "job_skill", job_skill_insert, overwrite = FALSE, append = TRUE, row.names = FALSE) #load into DB
+test_job_skill <- odbc::dbGetQuery(con, "SELECT * FROM ds_jobs.job_skill LIMIT 6;") #test insert
+print(test_job_skill)
+```
+
+## Analysis
+
+
+
+
+
+
+
+## Good Citizen
+```{r}
+dbDisconnect(con)
+```
