@@ -1,0 +1,178 @@
+---
+title: "Project – Data Science Skills"
+author: "Jennifer Abinette"
+output: html_document
+date: "2022-10-21"
+---
+### Purpose: W. Edwards Deming said, “In God we trust, all others must bring data.” Please use data to answer the question, “Which are the most valued data science skills?” Consider your work as an exploration; there is not necessarily a “right answer.”
+
+### Project Documentation: https://github.com/JAbinette/CUNY-607-Project-3-Data-Science-Skills 
+
+## Load Libraries
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(dplyr)
+library(stringr)
+library(DBI)
+```
+### Methodology: We will answer what data science skills are most valued by analyzing Job Listings for Data Scientist.  We will further analyze the affects (if any) of job location population.
+
+## 1) Create Github Repository for all group members to collaborate and share information - https://github.com/JAbinette/CUNY-607-Project-3-Data-Science-Skills
+
+## 2) Load from Github Repository: U.S. Population by City – dataset retrieved from census.gov, and State Abbreviation dataset from usps.com 
+https://www.census.gov/data/tables/time-series/demo/popest/2020s-total-cities-and-towns.html
+https://about.usps.com/who/profile/history/state-abbreviations.htm
+
+```{r}
+# Load U.S. Census Population (Source: https://www.census.gov/data/tables/time-series/demo/popest/2020s-total-cities-and-towns.html)
+p.url = 'https://raw.githubusercontent.com/JAbinette/CUNY-607-Project-3-Data-Science-Skills/main/U.S.%20Census%207-1-2021%20Subcounty%20Population%20Estimates.csv'
+pop_load <- read.csv( p.url, header = TRUE, sep = ",", stringsAsFactors = FALSE)
+
+# Load State Abbreviation data (Source: https://about.usps.com/who/profile/history/state-abbreviations.htm)
+st.url = 'https://raw.githubusercontent.com/JAbinette/CUNY-607-Project-3-Data-Science-Skills/main/State%20Abbreviations.csv'
+state_load <- read.csv( st.url, header = TRUE, sep = ",", stringsAsFactors = FALSE)
+
+head(pop_load)
+head(state_load)
+```
+## 3) Tidy/Transform Population dataset 
+
+```{r}
+# Create City variable (removes city/village/town etc.)
+pop_load$CITY <- str_to_upper( word(pop_load$NAME , 1  , -2) )
+
+# Merge to get State Abbreviation in State Population data set
+pop_load <- merge( pop_load, state_load, by.x = "STNAME", by.y = "State", all.x = TRUE)
+
+# Remove aggregates rows (e.g., State/County totals) by using criteria Place does not equal 0 https://www.census.gov/programs-surveys/geography/guidance/geo-identifiers.html
+# Remove inactive Functional Status is Active https://www.census.gov/library/reference/code-lists/functional-status-codes.html#:~:text=The%20functional%20status%20(FUNCSTAT)%20code,each%20code%20is%20valid%20for.
+pop_raw <- subset(pop_load, PLACE != 0 & FUNCSTAT =='A', select = c("CITY","ST","POPESTIMATE2021")) %>%
+  distinct()
+
+# Rename Columns
+names(pop_raw) <- c("CITY","STATE","POPULATION2021")
+
+# Add Location ID field
+pop_raw$LOCATIONID <- seq(1, nrow(pop_raw))
+
+head(pop_raw)
+```
+
+## 4) Load U.S. Data Scientist Job Listings – data set retrieved from Kaggle.com and saved in Github Repository https://www.kaggle.com/datasets/sl6149/data-scientist-job-market-in-the-us?resource=download&select=alldata.csv 
+```{r}
+url = 'https://raw.githubusercontent.com/JAbinette/CUNY-607-Project-3-Data-Science-Skills/main/U.S.%20Data%20Science%20Jobs.csv'
+file_load <- read.csv( url, header = TRUE, sep = ",", stringsAsFactors = FALSE)
+
+head(file_load)
+```
+## 5) Tidy/Transform Job Listings dataset
+```{r}
+# Rename Columns
+names(file_load) <- c("Position", "Company", "Description", "Reviews","Location")
+# Convert text to Uppercase
+file_load$Position <- str_to_upper(file_load$Position, locale = "en")
+file_load$Company <- str_to_upper(file_load$Company, locale = "en")
+file_load$Description <- str_to_upper(file_load$Description, locale = "en")
+file_load$Location <- str_to_upper(file_load$Location, locale = "en")
+
+# Create new variable that indicates if the position column contains Data Scientist/Science
+file_load$subset <- str_detect(file_load$Position, "DATA SCIEN", negate = FALSE)
+
+# Subset Data to remove unrelated positions and Company Review column (1444 Jobs)
+job_list_raw <- subset(file_load, subset==TRUE, select = c("Position","Company","Description","Location") )
+
+# Add Job ID field
+job_list_raw$JobID <- seq(1, nrow(job_list_raw))
+
+# Split Location field into City and State
+job_list_raw$subset_loc <- str_split_fixed(job_list_raw$Location, ', ', 2)
+job_list_raw$City <- job_list_raw$subset_loc[,1]
+job_list_raw$State <- substr(job_list_raw$subset_loc[,2], 1, 2)
+
+head(job_list_raw)
+```
+
+## 6) Merge with Population dataset to retrieve Location ID
+```{r}
+# Merge with population data frame to get the Location ID
+job_list_raw <- merge( job_list_raw, pop_raw, by.x = c("City","State"), by.y = c("CITY","STATE"), all.x = TRUE) %>%
+  arrange((JobID))
+
+# Create Job Listing table
+job_list <- subset(job_list_raw, select = c("JobID","Position","LOCATIONID","Company","Description"))
+
+head(job_list)
+```
+
+## 7) Load List Data Scientist Skills retrieved from Google Search Results and saved in Github Repository 
+```{r}
+sk.url = 'https://raw.githubusercontent.com/JAbinette/CUNY-607-Project-3-Data-Science-Skills/main/Data%20Scientist%20Skills%20-%20Google%20Search%20Results.csv'
+skills_load <- read.csv( sk.url, header = TRUE, sep = ",", stringsAsFactors = FALSE)
+skills_load$SkillsID <- seq(1, nrow(skills_load))
+
+head(skills_load)
+```
+
+## 8) Search in Job Description
+```{r}
+# New Data frame for evaluating Job Description content
+job_skills_raw <- subset(job_list_raw, select = c(JobID, Description))
+
+job_skills_raw$BigData <- str_detect(job_skills_raw$Description, 'BIG DATA', negate = FALSE)
+job_skills_raw$BusinessKnowledge <- str_detect(job_skills_raw$Description, 'BUSINESS KNOWLEDGE', negate = FALSE)
+job_skills_raw$CloudComputing <- str_detect(job_skills_raw$Description, 'CLOUD COMPUTING', negate = FALSE)
+job_skills_raw$CommunicationSkills <- str_detect(job_skills_raw$Description, 'COMMUNICATION SKILLS', negate = FALSE)
+job_skills_raw$DataAnalysis <- str_detect(job_skills_raw$Description, 'DATA ANALYSIS', negate = FALSE)
+job_skills_raw$DataIntuition <- str_detect(job_skills_raw$Description, 'DATA INTUITION', negate = FALSE)
+job_skills_raw$DataManipulation <- str_detect(job_skills_raw$Description, 'DATA MANIPULATION', negate = FALSE)
+job_skills_raw$DatabaseManagement <- str_detect(job_skills_raw$Description, 'DATABASE MANAGEMENT', negate = FALSE)
+job_skills_raw$DeepLearning <- str_detect(job_skills_raw$Description, 'DEEP LEARNING', negate = FALSE)
+job_skills_raw$Hadoop <- str_detect(job_skills_raw$Description, 'HADOOP', negate = FALSE)
+job_skills_raw$IBMDB2 <- str_detect(job_skills_raw$Description, 'IBM DB2', negate = FALSE)
+job_skills_raw$Java <- str_detect(job_skills_raw$Description, 'JAVA', negate = FALSE)
+job_skills_raw$Julia <- str_detect(job_skills_raw$Description, 'JULIA', negate = FALSE)
+job_skills_raw$MachineLearning <- str_detect(job_skills_raw$Description, 'MACHINE LEARNING', negate = FALSE)
+job_skills_raw$Mathematics <- str_detect(job_skills_raw$Description, 'MATHEMATICS', negate = FALSE)
+job_skills_raw$MATLAB <- str_detect(job_skills_raw$Description, 'MATLAB', negate = FALSE)
+job_skills_raw$MicrosoftAccess <- str_detect(job_skills_raw$Description, 'MICROSOFT ACCESS', negate = FALSE)
+job_skills_raw$MicrosoftExcel <- str_detect(job_skills_raw$Description, 'MICROSOFT EXCEL', negate = FALSE)
+job_skills_raw$MicrosoftPowerPoint <- str_detect(job_skills_raw$Description, 'MICROSOFT POWERPOINT', negate = FALSE)
+job_skills_raw$DataMining <- str_detect(job_skills_raw$Description, 'DATA MINING', negate = FALSE)
+job_skills_raw$DataModel <- str_detect(job_skills_raw$Description, 'DATA MODEL', negate = FALSE)
+job_skills_raw$MongoDB <- str_detect(job_skills_raw$Description, 'MONGODB', negate = FALSE)
+job_skills_raw$MySQL <- str_detect(job_skills_raw$Description, 'MYSQL', negate = FALSE)
+job_skills_raw$NaturalLanguageProcessing <- str_detect(job_skills_raw$Description, 'NATURAL LANGUAGE PROCESSING', negate = FALSE)
+job_skills_raw$Networking <- str_detect(job_skills_raw$Description, 'NETWORKING', negate = FALSE)
+job_skills_raw$NoSQL <- str_detect(job_skills_raw$Description, 'NOSQL', negate = FALSE)
+job_skills_raw$Oracle <- str_detect(job_skills_raw$Description, 'ORACLE', negate = FALSE)
+job_skills_raw$PostgreSQL <- str_detect(job_skills_raw$Description, 'POSTGRESQL', negate = FALSE)
+job_skills_raw$PowerBI <- str_detect(job_skills_raw$Description, 'POWER BI', negate = FALSE)
+job_skills_raw$PredictiveAnalysis <- str_detect(job_skills_raw$Description, 'PREDICTIVE ANALYSIS', negate = FALSE)
+job_skills_raw$Probability <- str_detect(job_skills_raw$Description, 'PROBABILITY', negate = FALSE)
+job_skills_raw$Programming <- str_detect(job_skills_raw$Description, 'PROGRAMMING', negate = FALSE)
+job_skills_raw$ProjectManager <- str_detect(job_skills_raw$Description, 'PROJECT MANAGER', negate = FALSE)
+job_skills_raw$Python <- str_detect(job_skills_raw$Description, 'PYTHON', negate = FALSE)
+job_skills_raw$R <- str_detect(job_skills_raw$Description, 'R', negate = FALSE)
+job_skills_raw$Scala <- str_detect(job_skills_raw$Description, 'SCALA', negate = FALSE)
+job_skills_raw$SoftwareEngineering <- str_detect(job_skills_raw$Description, 'SOFTWARE ENGINEERING', negate = FALSE)
+job_skills_raw$Spark <- str_detect(job_skills_raw$Description, 'SPARK', negate = FALSE)
+job_skills_raw$SQLServer <- str_detect(job_skills_raw$Description, 'SQL SERVER', negate = FALSE)
+job_skills_raw$Statistics <- str_detect(job_skills_raw$Description, 'STATISTICS', negate = FALSE)
+job_skills_raw$StorytellingSkills <- str_detect(job_skills_raw$Description, 'STORYTELLING SKILLS', negate = FALSE)
+job_skills_raw$StructuredThinking <- str_detect(job_skills_raw$Description, 'STRUCTURED THINKING', negate = FALSE)
+job_skills_raw$Tableau <- str_detect(job_skills_raw$Description, 'TABLEAU', negate = FALSE)
+job_skills_raw$TeamPlayer <- str_detect(job_skills_raw$Description, 'TEAM PLAYER', negate = FALSE)
+job_skills_raw$TensorFlow <- str_detect(job_skills_raw$Description, 'TENSORFLOW', negate = FALSE)
+job_skills_raw$TimeSeries <- str_detect(job_skills_raw$Description, 'TIME SERIES', negate = FALSE)
+job_skills_raw$TransformData <- str_detect(job_skills_raw$Description, 'TRANSFORM DATA', negate = FALSE)
+job_skills_raw$Trend <- str_detect(job_skills_raw$Description, 'TREND', negate = FALSE)
+job_skills_raw$VisualBasic <- str_detect(job_skills_raw$Description, 'VISUAL BASIC', negate = FALSE)
+job_skills_raw$Visualization <- str_detect(job_skills_raw$Description, 'VISUALIZATION', negate = FALSE)
+job_skills_raw$WebAPI <- str_detect(job_skills_raw$Description, 'WEB API', negate = FALSE)
+job_skills_raw$WebScraping <- str_detect(job_skills_raw$Description, 'WEB SCRAPING', negate = FALSE)
+job_skills_raw$Wrangling <- str_detect(job_skills_raw$Description, 'WRANGLING', negate = FALSE)
+
+head(job_skills_raw)
+```
+
