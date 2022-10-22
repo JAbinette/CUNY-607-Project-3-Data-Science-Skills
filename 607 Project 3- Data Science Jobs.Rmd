@@ -9,7 +9,7 @@ date: "2022-10-21"
 ### Project Documentation: https://github.com/JAbinette/CUNY-607-Project-3-Data-Science-Skills 
 
 ## Load Libraries
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, message= FALSE, warning=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(dplyr)
@@ -234,7 +234,7 @@ print(test_job)
 ```{r}
 job_skill_long <- job_skills_raw |> dplyr::select(!Description) |>    
                   tidyr::pivot_longer(!JobID, names_to = "skill", values_to = "t_f") #pivot to long data frame format
-job_skill_long <- job_skill_long |> left_join(skills_load, by = c("skill"="Variable.Name")) |>
+job_skill_long <- job_skill_long |> left_join(skills_load, by = c("skill"="Variable.Name"))
 job_skill_insert <- job_skill_long |> dplyr::filter(t_f == "TRUE") |> #subset for only true skill matches
                     dplyr::select(JobID, SkillsID) |>
                     dplyr::rename("job_id" = "JobID", "skill_id" = "SkillsID")
@@ -245,16 +245,46 @@ print(test_job_skill)
 ```
 
 ## Analysis
+
 Establish top 20 most frequently mentioned data science job skills.
+
 ```{r}
-job_total <- odbc::dbGetQuery(con,"")
-skill_count <- odbc::dbGetQuery(con,"SELECT skill, COUNT(job_id) AS count FROM ds_jobs.job_skill
+job_total <- as.numeric(odbc::dbGetQuery(con,"SELECT COUNT(job_id) as job_total FROM ds_jobs.job;"))
+job_per_skill <- odbc::dbGetQuery(con,"SELECT skill, COUNT(job_id) AS count FROM ds_jobs.job_skill
                   JOIN ds_jobs.skill on ds_jobs.job_skill.skill_id = ds_jobs.skill.skill_id
                   GROUP BY skill")
-head(skill_count)
+job_per_skill <- job_per_skill |> dplyr::mutate(percentage = round((count/job_total),3)) |>
+                            dplyr::arrange(desc(percentage)) |>
+                            dplyr::top_n(20)
+#plot
+p <- ggplot(job_per_skill, aes(x=reorder(skill, percentage), y=percentage)) +
+     geom_bar(stat="identity", fill="steelblue") + 
+     coord_flip() +
+     labs(title="Data Science Job Skill Frequency",
+        x ="Skill", y = "Percent")
+p
+```
+Plot a histogram of data science skills count per job
+
+```{r}
+skill_per_job <- odbc::dbGetQuery(con,"SELECT COUNT(skill_id) as skill_count FROM ds_jobs.job_skill
+GROUP BY job_id;")
+plt <- ggplot(skill_per_job, aes(x=skill_count)) +
+       geom_histogram(fill="steelblue") +
+       labs(title="Data Science Skill Quantities Per Job Listing",
+        x ="Skills per Job", y = "Count")
+plt
 ```
 
-
+Plotting the quantity of skills per job by city population.
+```{r}
+skillqty_per_pop <- odbc::dbGetQuery(con, "SELECT population, COUNT(skill_id) as skill_count FROM job_skill 
+JOIN job on job_skill.job_id = job.job_id
+JOIN location on job.location_id = location.location_id
+GROUP BY job_skill.job_id;")
+pl <- ggplot(skillqty_per_pop, aes(x=population, y=skill_count)) + geom_point()
+pl
+```
 
 
 
