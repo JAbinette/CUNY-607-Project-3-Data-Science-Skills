@@ -1,6 +1,6 @@
 ---
 title: "Project – Data Science Skills"
-author: "Jennifer Abinette"
+author: "Jennifer Abinette & Avery Davidowitz"
 output: html_document
 date: "2022-10-21"
 ---
@@ -292,3 +292,4 @@ pl
 ```{r}
 dbDisconnect(con)
 ```
+### Conclusions: Our analysis indicates that the most frequently mentioned and therefore most valued data science skills include R, Python, Machine Learning, Statistics, Mathematics and Programming.  On average, a job listing referenced around eight of the 53 data science skills we searched, but overall there did not seem to be a relationship between location population and the quantity of skills listed in the job listing.
