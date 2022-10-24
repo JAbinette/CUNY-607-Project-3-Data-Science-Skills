@@ -16,7 +16,7 @@ library(dplyr)
 library(stringr)
 library(DBI)
 ```
-### Methodology: We will answer what data science skills are most valued by analyzing Job Listings for Data Scientist.  We will further analyze the affects (if any) of job location population.
+### Methodology: We will answer what data science skills are most valued by analyzing Job Listings for Data Scientist.  We created a list of 53 skills based on a Google Search of the most valued data scientist skills that will be searched for in each job description.  The skills most frequently referenced are the ones that are the most valued for a Data Scientist position.  We will further analyze how many skills are included per job listing and the affects (if any) of job location population.  We want to explore if job listings for larger cities reference more skills than smaller cities.
 
 ## 1) Create Github Repository for all group members to collaborate and share information - https://github.com/JAbinette/CUNY-607-Project-3-Data-Science-Skills
 
