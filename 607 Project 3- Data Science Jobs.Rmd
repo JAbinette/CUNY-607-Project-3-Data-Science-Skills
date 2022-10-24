@@ -177,7 +177,7 @@ head(job_skills_raw)
 
 ```
 
-## Establish database connection
+## 9) Establish database connection
 Must have RMySQL package installed
 ```{r}
 #Prompt for username and password for security 
@@ -192,7 +192,7 @@ con <- dbConnect(RMySQL::MySQL(),
                  password = password)
 ```
 
-## Load location table data into DB
+## 10) Load location table data into DB
 ```{r}
 col_order <- c("LOCATIONID", "CITY", "STATE",
                "POPULATION2021")
@@ -206,7 +206,7 @@ dbWriteTable(con, "location", location_insert, overwrite = FALSE, append = TRUE,
 test_location <- odbc::dbGetQuery(con, "SELECT * FROM ds_jobs.location LIMIT 6;") #test insert
 print(test_location)
 ```
-## Load skills table data into DB
+## 11) Load skills table data into DB
 ```{r}
 skill_insert <- skills_load |> dplyr::select(SkillsID, Data.Science.Skills) #subset skills
 skill_insert <- skill_insert |>                                             #rename columns to match db
@@ -217,7 +217,7 @@ test_skill <- odbc::dbGetQuery(con, "SELECT * FROM ds_jobs.skill LIMIT 6;") #tes
 print(test_skill)
 ```
 
-## Load job table data into DB
+## 12) Load job table data into DB
 ```{r}
 job_insert <- job_list |>
                     dplyr::rename("job_id" = "JobID",          #rename columns to match db
@@ -230,7 +230,7 @@ test_job <- odbc::dbGetQuery(con, "SELECT * FROM ds_jobs.job LIMIT 6;") #test in
 print(test_job)
 ```
 
-## Load job skills data into DB
+## 13) Load job skills data into DB
 ```{r}
 job_skill_long <- job_skills_raw |> dplyr::select(!Description) |>    
                   tidyr::pivot_longer(!JobID, names_to = "skill", values_to = "t_f") #pivot to long data frame format
@@ -244,9 +244,9 @@ test_job_skill <- odbc::dbGetQuery(con, "SELECT * FROM ds_jobs.job_skill LIMIT 6
 print(test_job_skill)
 ```
 
-## Analysis
+### Analysis
 
-Establish top 20 most frequently mentioned data science job skills.
+## 14) What are the Top 20 most frequently mentioned data science job skills?
 
 ```{r}
 job_total <- as.numeric(odbc::dbGetQuery(con,"SELECT COUNT(job_id) as job_total FROM ds_jobs.job;"))
@@ -264,9 +264,10 @@ p <- ggplot(job_per_skill, aes(x=reorder(skill, percentage), y=percentage)) +
         x ="Skill", y = "Percent")
 p
 ```
-Plot a histogram of data science skills count per job
+## 15) How many data science skills are included per job listing?
 
 ```{r}
+#Plot a histogram of data science skills count per job
 skill_per_job <- odbc::dbGetQuery(con,"SELECT COUNT(skill_id) as skill_count FROM ds_jobs.job_skill
 GROUP BY job_id;")
 plt <- ggplot(skill_per_job, aes(x=skill_count)) +
@@ -276,8 +277,10 @@ plt <- ggplot(skill_per_job, aes(x=skill_count)) +
 plt
 ```
 
-Plotting the quantity of skills per job by city population.
+## 16) Does the number of skills per job vary based on the population of the job's location?
+
 ```{r}
+#Plotting the quantity of skills per job by city population.
 skillqty_per_pop <- odbc::dbGetQuery(con, "SELECT population, COUNT(skill_id) as skill_count FROM job_skill 
 JOIN job on job_skill.job_id = job.job_id
 JOIN location on job.location_id = location.location_id
@@ -285,11 +288,6 @@ GROUP BY job_skill.job_id;")
 pl <- ggplot(skillqty_per_pop, aes(x=population, y=skill_count)) + geom_point()
 pl
 ```
-
-
-
-
-
 ## Good Citizen
 ```{r}
 dbDisconnect(con)
