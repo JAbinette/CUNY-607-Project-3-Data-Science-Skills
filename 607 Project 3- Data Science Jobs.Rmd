@@ -118,6 +118,8 @@ head(skills_load)
 ```{r}
 # New Data frame for evaluating Job Description content
 job_skills_raw <- subset(job_list_raw, select = c(JobID, Description))
+# Replace punctuation and new lines with spaces for search below
+job_skills_raw$Description <- str_replace_all(job_skills_raw$Description, "[\r\n\\.,]" , " ")
 
 job_skills_raw$BigData <- str_detect(job_skills_raw$Description, 'BIG DATA', negate = FALSE)
 job_skills_raw$BusinessKnowledge <- str_detect(job_skills_raw$Description, 'BUSINESS KNOWLEDGE', negate = FALSE)
@@ -153,7 +155,7 @@ job_skills_raw$Probability <- str_detect(job_skills_raw$Description, 'PROBABILIT
 job_skills_raw$Programming <- str_detect(job_skills_raw$Description, 'PROGRAMMING', negate = FALSE)
 job_skills_raw$ProjectManager <- str_detect(job_skills_raw$Description, 'PROJECT MANAGER', negate = FALSE)
 job_skills_raw$Python <- str_detect(job_skills_raw$Description, 'PYTHON', negate = FALSE)
-job_skills_raw$R <- str_detect(job_skills_raw$Description, 'R', negate = FALSE)
+job_skills_raw$R <- str_detect(job_skills_raw$Description, ' R ', negate = FALSE)
 job_skills_raw$Scala <- str_detect(job_skills_raw$Description, 'SCALA', negate = FALSE)
 job_skills_raw$SoftwareEngineering <- str_detect(job_skills_raw$Description, 'SOFTWARE ENGINEERING', negate = FALSE)
 job_skills_raw$Spark <- str_detect(job_skills_raw$Description, 'SPARK', negate = FALSE)
